@@ -136,16 +136,13 @@ async fn handle_remove_user(
     Ok(())
 }
 
-pub async fn handle_on_channel_delete(
-    channel: &serenity::GuildChannel,
-    data: &Data,
-) -> Result<(), Error> {
+pub async fn handle_on_channel_delete(channel_id: u64, data: &Data) -> Result<(), Error> {
     {
         if !data
             .channels_and_messages
             .lock()
             .unwrap()
-            .contains_key(&channel.id.0)
+            .contains_key(&channel_id)
         {
             return Ok(());
         }
@@ -153,7 +150,7 @@ pub async fn handle_on_channel_delete(
 
     sqlx::query!(
         "DELETE FROM channel_message WHERE channel_id = $1",
-        channel.id.0 as i64
+        channel_id as i64
     )
     .execute(&data.db_pool)
     .await?;
@@ -163,10 +160,10 @@ pub async fn handle_on_channel_delete(
         data.channels_and_messages
             .lock()
             .unwrap()
-            .remove(&channel.id.0);
+            .remove(&channel_id);
     }
 
-    info!("removed room {}", channel.id.0);
+    info!("removed room {}", channel_id);
 
     Ok(())
 }

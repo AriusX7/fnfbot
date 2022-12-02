@@ -145,7 +145,7 @@ async fn app() -> Result<(), Error> {
                             .await?
                     },
                     Event::ChannelDelete { channel } => {
-                        events::handle_on_channel_delete(channel, data).await?
+                        events::handle_on_channel_delete(channel.id.0, data).await?
                     },
                     Event::Ready { data_about_bot } => {
                         info!("Connected as {}", data_about_bot.user.tag());

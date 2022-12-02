@@ -140,12 +140,31 @@ pub async fn handle_on_channel_delete(
     channel: &serenity::GuildChannel,
     data: &Data,
 ) -> Result<(), Error> {
+    {
+        if !data
+            .channels_and_messages
+            .lock()
+            .unwrap()
+            .contains_key(&channel.id.0)
+        {
+            return Ok(());
+        }
+    }
+
     sqlx::query!(
         "DELETE FROM channel_message WHERE channel_id = $1",
         channel.id.0 as i64
     )
     .execute(&data.db_pool)
     .await?;
+
+    // only remove from our local cache if database removal is successful
+    {
+        data.channels_and_messages
+            .lock()
+            .unwrap()
+            .remove(&channel.id.0);
+    }
 
     info!("removed room {}", channel.id.0);
 

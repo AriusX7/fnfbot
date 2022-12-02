@@ -118,6 +118,7 @@ async fn app() -> Result<(), Error> {
             commands::reacts(),
             commands::sethost(),
             commands::shutdown(),
+            commands::remove(),
         ],
         prefix_options: poise::PrefixFrameworkOptions {
             prefix: Some("~".into()),

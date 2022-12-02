@@ -1,7 +1,7 @@
 use poise::serenity_prelude::{self as serenity, CacheHttp, Mentionable};
 use tracing::error;
 
-use crate::{invite_url, Context, Error, EMBED_COLOUR, REACT_STR};
+use crate::{events, invite_url, Context, Error, EMBED_COLOUR, REACT_STR};
 
 /// Set up self-role reaction message for a new room.
 #[poise::command(prefix_command, guild_only, check = "is_host")]
@@ -178,6 +178,23 @@ pub async fn invite(ctx: Context<'_>) -> Result<(), Error> {
         invite_url(&user, &ctx).await?,
     ))
     .await?;
+    Ok(())
+}
+
+/// Removes a room from the database.
+#[poise::command(prefix_command, check = "is_host")]
+pub async fn remove(
+    ctx: Context<'_>,
+    #[description = "Channel for the room"] channel: serenity::ChannelId,
+) -> Result<(), Error> {
+    events::handle_on_channel_delete(channel.0, ctx.data()).await?;
+
+    ctx.say(format!(
+        "Removed the room associated with channel {}",
+        channel.mention()
+    ))
+    .await?;
+
     Ok(())
 }
 

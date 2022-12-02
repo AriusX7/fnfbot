@@ -1,0 +1,25 @@
+[package]
+name = "fnfbot"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+poise = "0.5.0"
+tokio = { version = "1.21.2", default-features = false, features = [
+    "rt-multi-thread",
+    "macros",
+    "signal",
+] }
+dotenv = "0.15.0"
+tracing = "0.1.37"
+tracing-subscriber = "0.3.16"
+tracing-futures = "0.2.5"
+sqlx = { version = "0.6", default-features = false, features = [
+    "runtime-tokio-rustls",
+    "postgres",
+    "macros",
+    "offline",
+    "migrate",
+] }

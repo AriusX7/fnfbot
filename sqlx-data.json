@@ -1,0 +1,155 @@
+{
+  "db": "PostgreSQL",
+  "008ef4f231b41e5d09209c5dd4c3b5ae26999cb534967ecab4a52e1c77d71847": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      }
+    },
+    "query": "INSERT INTO react (channel_id, user_id) VALUES ($1, $2)\n            ON CONFLICT (channel_id, user_id) DO NOTHING"
+  },
+  "05636c17d0c249537c904e80a83357e2b2e19f553c2eed45ba5e24f47bc7d63e": {
+    "describe": {
+      "columns": [
+        {
+          "name": "channel_id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "message_id",
+          "ordinal": 1,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "SELECT * FROM channel_message"
+  },
+  "59674678506ba9d47b7dec6be0fbefbeae795e6a431f377212f7da9584282bee": {
+    "describe": {
+      "columns": [
+        {
+          "name": "count",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "SELECT COUNT(*) FROM react WHERE channel_id = $1"
+  },
+  "5db3b911f700d913b94217b9407bc936ac63dea646ed890392543c67e8fd224f": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      }
+    },
+    "query": "INSERT INTO config VALUES ($1, $2)\n        ON CONFLICT (guild_id) DO UPDATE SET host_role_id = EXCLUDED.host_role_id;"
+  },
+  "69f655f2be736ccfe505bc32bad9638161f0317a7243456e589d63a70020f5c7": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      }
+    },
+    "query": "INSERT INTO channel_message VALUES($1, $2) ON CONFLICT (channel_id) DO NOTHING"
+  },
+  "85ebc384f3d9f1e586dadbfabdea53731506d1be686d41accbffcf15314c561d": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      }
+    },
+    "query": "DELETE FROM react WHERE channel_id = $1 AND user_id = $2"
+  },
+  "922dda0d16b61a25068183d3b7c7892ad15d72e175433a4e35cab33d0263acfb": {
+    "describe": {
+      "columns": [
+        {
+          "name": "guild_id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "host_role_id",
+          "ordinal": 1,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false,
+        true
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "SELECT * FROM config"
+  },
+  "e7984e1c665a3fafe6bf6f264ec64b359c67c44812505a8b3d76063ebe8c41f0": {
+    "describe": {
+      "columns": [
+        {
+          "name": "user_id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "SELECT user_id FROM react WHERE channel_id = $1 ORDER BY react_num"
+  },
+  "f87cac249220e87f5c1d1fe3d928718b2c0a4cb615df711ac6d25c5f5a378e1a": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "DELETE FROM channel_message WHERE channel_id = $1"
+  }
+}

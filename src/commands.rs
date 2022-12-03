@@ -99,9 +99,9 @@ pub async fn reacts(
             true,
         );
 
-        if records.len() >= 9 {
+        if records.len() > 9 {
             embed.field(
-                format!("Reserves ({}/5)", records.len() - 9),
+                format!("Reserves ({}/6)", records.len() - 9),
                 reserves,
                 true,
             );

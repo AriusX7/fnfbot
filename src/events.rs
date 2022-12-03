@@ -104,7 +104,7 @@ async fn handle_add_user(
     .fetch_one(&data.db_pool)
     .await?;
 
-    if record.count.unwrap_or_default() == 14 {
+    if record.count.unwrap_or_default() >= 15 {
         return Ok(());
     }
 

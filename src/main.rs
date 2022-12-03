@@ -175,8 +175,11 @@ async fn app() -> Result<(), Error> {
 
     let framework = poise::Framework::builder()
         .token(env::var("DISCORD_TOKEN").expect("Missing `DISCORD_TOKEN` env var."))
-        .setup(move |_ctx, _ready, _framework| {
+        .setup(move |ctx, _ready, _framework| {
             Box::pin(async move {
+                ctx.set_activity(serenity::Activity::playing("Friday Night Friendlies"))
+                    .await;
+
                 Ok(Data {
                     db_pool,
                     channels_and_messages,

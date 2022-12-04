@@ -71,9 +71,9 @@ pub async fn host(
 
 /// Shows the users that signed up for the room.
 #[poise::command(prefix_command, aliases("reacts"), guild_only, check = "is_host")]
-pub async fn signups(
+pub async fn registrations(
     ctx: Context<'_>,
-    #[description = "Message link for the room"]
+    #[description = "Message ID for the room"]
     #[rest]
     message_id: ParseableMessageId,
 ) -> Result<(), Error> {

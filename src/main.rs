@@ -12,7 +12,7 @@ use poise::serenity_prelude::{self as serenity, Permissions};
 use poise::Event;
 use tracing::{error, info, instrument, trace};
 
-pub const REACT_STR: &str = "react to this message to signup";
+pub const REACT_STR: &str = "react to this message to register";
 pub const EMBED_COLOUR: u32 = 0x007FB3;
 
 // Types used by all command functions
@@ -125,7 +125,7 @@ async fn app() -> Result<(), Error> {
             help(),
             register(),
             commands::host(),
-            commands::signups(),
+            commands::registrations(),
             commands::sethost(),
             commands::shutdown(),
             commands::remove(),

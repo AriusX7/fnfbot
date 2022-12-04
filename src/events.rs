@@ -9,9 +9,10 @@ pub async fn handle_on_raw_reaction(
     data: &Data,
     bot_id: u64,
 ) -> Result<(), Error> {
-    if reaction.guild_id.is_none() {
-        return Ok(());
-    }
+    let guild_id = match reaction.guild_id {
+        Some(gid) => gid,
+        _ => return Ok(()),
+    };
 
     let user_id = match reaction.user_id {
         Some(uid) if uid != bot_id => uid,
@@ -21,42 +22,46 @@ pub async fn handle_on_raw_reaction(
     let channel_id = reaction.channel_id;
 
     {
-        match data
-            .channels_and_messages
+        if data
+            .guild_configs
             .lock()
             .unwrap()
-            .get(&channel_id.0)
+            .get(&guild_id.0)
+            .filter(|f| f.channel_id == Some(channel_id.0))
+            .is_none()
         {
-            Some(&msg_id) if msg_id == reaction.message_id.0 => (),
-            _ => return Ok(()),
+            return Ok(());
+        }
+    }
+
+    let message_id = reaction.message_id;
+
+    {
+        if !data.messages.lock().unwrap().contains(&message_id.0) {
+            return Ok(());
         }
     }
 
     if reaction.emoji.unicode_eq("✅") {
-        handle_add_user(data, channel_id, user_id).await?;
-        info!("signed up user {} for room {}", user_id, channel_id.0);
+        handle_add_user(data, message_id, user_id).await?;
+        info!("signed up user {} for room {}", user_id, message_id.0);
     } else if reaction.emoji.unicode_eq("❌") {
-        handle_remove_user(data, channel_id, user_id).await?;
-        info!("removed user {} from room {}", user_id, channel_id.0);
+        handle_remove_user(data, message_id, user_id).await?;
+        info!("removed user {} from room {}", user_id, message_id.0);
     } else {
         return Ok(());
     }
 
     // try to remove the reaction
     channel_id
-        .delete_reaction(
-            ctx,
-            reaction.message_id,
-            Some(user_id),
-            reaction.emoji.clone(),
-        )
+        .delete_reaction(ctx, message_id, Some(user_id), reaction.emoji.clone())
         .await?;
 
     // update message footer with new number of signups
-    let mut msg = if let Some(m) = ctx.cache.message(channel_id, reaction.message_id) {
+    let mut msg = if let Some(m) = ctx.cache.message(channel_id, message_id) {
         m
     } else {
-        channel_id.message(&ctx, reaction.message_id).await?
+        channel_id.message(&ctx, message_id).await?
     };
 
     let embed = if let Some(e) = msg.embeds.first() {
@@ -69,8 +74,8 @@ pub async fn handle_on_raw_reaction(
         }
 
         let record = sqlx::query!(
-            "SELECT COUNT(*) FROM react WHERE channel_id = $1",
-            channel_id.0 as i64
+            "SELECT COUNT(*) FROM signup WHERE message_id = $1",
+            message_id.0 as i64
         )
         .fetch_one(&data.db_pool)
         .await?;
@@ -94,12 +99,12 @@ pub async fn handle_on_raw_reaction(
 
 async fn handle_add_user(
     data: &Data,
-    channel_id: serenity::ChannelId,
+    message_id: serenity::MessageId,
     user_id: serenity::UserId,
 ) -> Result<(), Error> {
     let record = sqlx::query!(
-        "SELECT COUNT(*) FROM react WHERE channel_id = $1",
-        channel_id.0 as i64
+        "SELECT COUNT(*) FROM signup WHERE message_id = $1",
+        message_id.0 as i64
     )
     .fetch_one(&data.db_pool)
     .await?;
@@ -109,9 +114,9 @@ async fn handle_add_user(
     }
 
     sqlx::query!(
-        "INSERT INTO react (channel_id, user_id) VALUES ($1, $2)
-            ON CONFLICT (channel_id, user_id) DO NOTHING",
-        channel_id.0 as i64,
+        "INSERT INTO signup (message_id, user_id) VALUES ($1, $2)
+            ON CONFLICT (message_id, user_id) DO NOTHING",
+        message_id.0 as i64,
         user_id.0 as i64,
     )
     .execute(&data.db_pool)
@@ -122,48 +127,16 @@ async fn handle_add_user(
 
 async fn handle_remove_user(
     data: &Data,
-    channel_id: serenity::ChannelId,
+    message_id: serenity::MessageId,
     user_id: serenity::UserId,
 ) -> Result<(), Error> {
     sqlx::query!(
-        "DELETE FROM react WHERE channel_id = $1 AND user_id = $2",
-        channel_id.0 as i64,
+        "DELETE FROM signup WHERE message_id = $1 AND user_id = $2",
+        message_id.0 as i64,
         user_id.0 as i64,
     )
     .execute(&data.db_pool)
     .await?;
-
-    Ok(())
-}
-
-pub async fn handle_on_channel_delete(channel_id: u64, data: &Data) -> Result<(), Error> {
-    {
-        if !data
-            .channels_and_messages
-            .lock()
-            .unwrap()
-            .contains_key(&channel_id)
-        {
-            return Ok(());
-        }
-    }
-
-    sqlx::query!(
-        "DELETE FROM channel_message WHERE channel_id = $1",
-        channel_id as i64
-    )
-    .execute(&data.db_pool)
-    .await?;
-
-    // only remove from our local cache if database removal is successful
-    {
-        data.channels_and_messages
-            .lock()
-            .unwrap()
-            .remove(&channel_id);
-    }
-
-    info!("removed room {}", channel_id);
 
     Ok(())
 }

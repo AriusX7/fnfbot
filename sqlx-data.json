@@ -1,6 +1,24 @@
 {
   "db": "PostgreSQL",
-  "008ef4f231b41e5d09209c5dd4c3b5ae26999cb534967ecab4a52e1c77d71847": {
+  "23469c89751f3fb42d8c48978abfc4540105eadc3c026de8d8ea842759f032e4": {
+    "describe": {
+      "columns": [
+        {
+          "name": "message_id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "SELECT * FROM message"
+  },
+  "3ad3177ea2ed17376d263101518d39d27cf6268578ace81c5ee5eb3f7dc95cce": {
     "describe": {
       "columns": [],
       "nullable": [],
@@ -11,33 +29,34 @@
         ]
       }
     },
-    "query": "INSERT INTO react (channel_id, user_id) VALUES ($1, $2)\n            ON CONFLICT (channel_id, user_id) DO NOTHING"
+    "query": "INSERT INTO signup (message_id, user_id) VALUES ($1, $2)\n            ON CONFLICT (message_id, user_id) DO NOTHING"
   },
-  "05636c17d0c249537c904e80a83357e2b2e19f553c2eed45ba5e24f47bc7d63e": {
+  "5db3b911f700d913b94217b9407bc936ac63dea646ed890392543c67e8fd224f": {
     "describe": {
-      "columns": [
-        {
-          "name": "channel_id",
-          "ordinal": 0,
-          "type_info": "Int8"
-        },
-        {
-          "name": "message_id",
-          "ordinal": 1,
-          "type_info": "Int8"
-        }
-      ],
-      "nullable": [
-        false,
-        false
-      ],
+      "columns": [],
+      "nullable": [],
       "parameters": {
-        "Left": []
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
       }
     },
-    "query": "SELECT * FROM channel_message"
+    "query": "INSERT INTO config VALUES ($1, $2)\n        ON CONFLICT (guild_id) DO UPDATE SET host_role_id = EXCLUDED.host_role_id;"
   },
-  "59674678506ba9d47b7dec6be0fbefbeae795e6a431f377212f7da9584282bee": {
+  "74f4de4c79c78e064361ddb6442dd25354622a04ba696b1fc09ac5722ae6e43e": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "INSERT INTO message VALUES($1) ON CONFLICT (message_id) DO NOTHING"
+  },
+  "79cc39ccf795d4c6f0e6517d8d5d0482080d783372e778781b84fe28da9ea120": {
     "describe": {
       "columns": [
         {
@@ -55,46 +74,7 @@
         ]
       }
     },
-    "query": "SELECT COUNT(*) FROM react WHERE channel_id = $1"
-  },
-  "5db3b911f700d913b94217b9407bc936ac63dea646ed890392543c67e8fd224f": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8"
-        ]
-      }
-    },
-    "query": "INSERT INTO config VALUES ($1, $2)\n        ON CONFLICT (guild_id) DO UPDATE SET host_role_id = EXCLUDED.host_role_id;"
-  },
-  "69f655f2be736ccfe505bc32bad9638161f0317a7243456e589d63a70020f5c7": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8"
-        ]
-      }
-    },
-    "query": "INSERT INTO channel_message VALUES($1, $2) ON CONFLICT (channel_id) DO NOTHING"
-  },
-  "85ebc384f3d9f1e586dadbfabdea53731506d1be686d41accbffcf15314c561d": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8"
-        ]
-      }
-    },
-    "query": "DELETE FROM react WHERE channel_id = $1 AND user_id = $2"
+    "query": "SELECT COUNT(*) FROM signup WHERE message_id = $1"
   },
   "922dda0d16b61a25068183d3b7c7892ad15d72e175433a4e35cab33d0263acfb": {
     "describe": {
@@ -108,10 +88,16 @@
           "name": "host_role_id",
           "ordinal": 1,
           "type_info": "Int8"
+        },
+        {
+          "name": "fnf_channel_id",
+          "ordinal": 2,
+          "type_info": "Int8"
         }
       ],
       "nullable": [
         false,
+        true,
         true
       ],
       "parameters": {
@@ -120,7 +106,32 @@
     },
     "query": "SELECT * FROM config"
   },
-  "e7984e1c665a3fafe6bf6f264ec64b359c67c44812505a8b3d76063ebe8c41f0": {
+  "a3833a2cd9fe397503e77fb3f1070f8e9fdfb424121246fc99665d63c377d08f": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      }
+    },
+    "query": "DELETE FROM signup WHERE message_id = $1 AND user_id = $2"
+  },
+  "ddda8fedcafed03f81135c3e111524113ab2999daeed52ef5e3f05e20294e154": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "DELETE FROM message WHERE message_id = $1"
+  },
+  "fdaeabd85713c19ade5031cb7215c53a40953a34b2f31ff321dbe69287a23729": {
     "describe": {
       "columns": [
         {
@@ -138,18 +149,6 @@
         ]
       }
     },
-    "query": "SELECT user_id FROM react WHERE channel_id = $1 ORDER BY react_num"
-  },
-  "f87cac249220e87f5c1d1fe3d928718b2c0a4cb615df711ac6d25c5f5a378e1a": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      }
-    },
-    "query": "DELETE FROM channel_message WHERE channel_id = $1"
+    "query": "SELECT user_id FROM signup WHERE message_id = $1 ORDER BY react_num"
   }
 }

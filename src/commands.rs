@@ -1,28 +1,39 @@
 use poise::serenity_prelude::{self as serenity, CacheHttp, Mentionable};
 use tracing::error;
 
-use crate::{events, invite_url, Context, Error, EMBED_COLOUR, REACT_STR};
+use crate::utils::{get_message_link, ParseableMessageId};
+use crate::{invite_url, Context, Error, GuildConfig, EMBED_COLOUR, REACT_STR};
 
 /// Set up self-role reaction message for a new room.
 #[poise::command(prefix_command, guild_only, check = "is_host")]
 pub async fn host(
     ctx: Context<'_>,
-    #[description = "Channel for the room"] channel: serenity::GuildChannel,
     #[description = "Date for the room"] date: String,
     #[description = "Time for the room"]
     #[rest]
     time: String,
 ) -> Result<(), Error> {
-    let exit = {
-        let channels = ctx.data().channels_and_messages.lock().unwrap();
-        channels.contains_key(&channel.id.0)
+    let guild_id = match ctx.guild_id() {
+        Some(gid) => gid,
+        None => return Ok(()),
     };
 
-    if exit {
-        ctx.say("Self-role message already exists for this channel.")
-            .await?;
-        return Ok(());
-    }
+    let channel = {
+        if let Some(id) = ctx
+            .data()
+            .guild_configs
+            .lock()
+            .unwrap()
+            .get(&guild_id.0)
+            .copied()
+            .unwrap_or_default()
+            .channel_id
+        {
+            serenity::ChannelId(id)
+        } else {
+            return Err("fnf channel not set".into());
+        }
+    };
 
     let msg = channel
         .send_message(&ctx, |m| {
@@ -41,16 +52,15 @@ pub async fn host(
     msg.react(&ctx, '❌').await?;
 
     sqlx::query!(
-        "INSERT INTO channel_message VALUES($1, $2) ON CONFLICT (channel_id) DO NOTHING",
-        channel.id.0 as i64,
+        "INSERT INTO message VALUES($1) ON CONFLICT (message_id) DO NOTHING",
         msg.id.0 as i64,
     )
     .execute(&ctx.data().db_pool)
     .await?;
 
     {
-        let mut channels = ctx.data().channels_and_messages.lock().unwrap();
-        channels.insert(channel.id.0, msg.id.0);
+        let mut messages = ctx.data().messages.lock().unwrap();
+        messages.insert(msg.id.0);
     }
 
     ctx.say("Self-role reaction message was set up successfully.")
@@ -60,16 +70,16 @@ pub async fn host(
 }
 
 /// Shows the users that signed up for the room.
-#[poise::command(prefix_command, guild_only, check = "is_host")]
-pub async fn reacts(
+#[poise::command(prefix_command, aliases("reacts"), guild_only, check = "is_host")]
+pub async fn signups(
     ctx: Context<'_>,
-    #[description = "Channel for the room"]
+    #[description = "Message link for the room"]
     #[rest]
-    channel: serenity::GuildChannel,
+    message_id: ParseableMessageId,
 ) -> Result<(), Error> {
     let records = sqlx::query!(
-        "SELECT user_id FROM react WHERE channel_id = $1 ORDER BY react_num",
-        channel.id.0 as i64
+        "SELECT user_id FROM signup WHERE message_id = $1 ORDER BY react_num",
+        message_id.0 as i64
     )
     .fetch_all(&ctx.data().db_pool)
     .await?;
@@ -77,7 +87,17 @@ pub async fn reacts(
     let mut embed = serenity::CreateEmbed::default();
     embed.colour(EMBED_COLOUR);
 
-    let desc_start = format!("**Signups for Room {}**", channel.mention());
+    let guild_id = match ctx.guild_id() {
+        Some(gid) => gid,
+        None => unreachable!(),
+    };
+
+    let desc_start = if let Some(link) = get_message_link(message_id.0, ctx.data(), guild_id) {
+        format!("**Signups for Room [{}]({})**", message_id.0, link)
+    } else {
+        format!("**Signups for Room {}**", message_id.0,)
+    };
+
     if records.is_empty() {
         embed.description(format!("{desc_start}\n\nNo signups yet."));
     } else {
@@ -131,14 +151,14 @@ pub async fn sethost(
     };
 
     // we try updating our local host ids cache first intentionally
-
     {
-        let mut ids = ctx.data().host_ids.lock().unwrap();
-        ids.insert(guild_id.0, Some(id));
+        let mut ids = ctx.data().guild_configs.lock().unwrap();
+        let entry = ids.entry(guild_id.0).or_default();
+        entry.host_id = Some(id);
     }
 
     sqlx::query!(
-        "INSERT INTO config VALUES ($1, $2)
+        "INSERT INTO config (guild_id, host_role_id) VALUES ($1, $2)
         ON CONFLICT (guild_id) DO UPDATE SET host_role_id = EXCLUDED.host_role_id;",
         guild_id.0 as i64,
         id as i64
@@ -147,6 +167,39 @@ pub async fn sethost(
     .await?;
 
     ctx.say("Set host role id.").await?;
+
+    Ok(())
+}
+
+/// Sets the fnf self roles channel ID.
+#[poise::command(prefix_command, owners_only, guild_only)]
+pub async fn fnfchannel(
+    ctx: Context<'_>,
+    #[description = "The fnf channel id"] channel_id: serenity::ChannelId,
+) -> Result<(), Error> {
+    let guild_id = match ctx.guild_id() {
+        Some(gid) => gid,
+        None => return Ok(()),
+    };
+
+    // we try updating our local host ids cache first intentionally
+    {
+        let mut ids = ctx.data().guild_configs.lock().unwrap();
+        let entry = ids.entry(guild_id.0).or_default();
+        entry.channel_id = Some(channel_id.0);
+    }
+
+    sqlx::query!(
+        "INSERT INTO config (guild_id, fnf_channel_id) VALUES ($1, $2)
+        ON CONFLICT (guild_id) DO UPDATE SET fnf_channel_id = EXCLUDED.fnf_channel_id;",
+        guild_id.0 as i64,
+        channel_id.0 as i64
+    )
+    .execute(&ctx.data().db_pool)
+    .await?;
+
+    ctx.say(format!("Set {} as the fnf channel.", channel_id.mention()))
+        .await?;
 
     Ok(())
 }
@@ -185,13 +238,23 @@ pub async fn invite(ctx: Context<'_>) -> Result<(), Error> {
 #[poise::command(prefix_command, check = "is_host")]
 pub async fn remove(
     ctx: Context<'_>,
-    #[description = "Channel for the room"] channel: serenity::ChannelId,
+    #[description = "Message ID for the room"] message_id: u64,
 ) -> Result<(), Error> {
-    events::handle_on_channel_delete(channel.0, ctx.data()).await?;
+    sqlx::query!(
+        "DELETE FROM message WHERE message_id = $1",
+        message_id as i64
+    )
+    .execute(&ctx.data().db_pool)
+    .await?;
+
+    // only remove from our local cache if database removal is successful
+    {
+        ctx.data().messages.lock().unwrap().remove(&message_id);
+    }
 
     ctx.say(format!(
-        "Removed the room associated with channel {}",
-        channel.mention()
+        "Removed the room associated with message {}",
+        message_id
     ))
     .await?;
 
@@ -206,8 +269,16 @@ async fn is_host(ctx: Context<'_>) -> Result<bool, Error> {
     };
 
     let host_role_id = {
-        if let Some(Some(id)) = ctx.data().host_ids.lock().unwrap().get(&guild_id.0) {
-            *id
+        if let Some(GuildConfig {
+            channel_id: _,
+            host_id,
+        }) = ctx.data().guild_configs.lock().unwrap().get(&guild_id.0)
+        {
+            if let Some(id) = host_id {
+                *id
+            } else {
+                return Ok(false);
+            }
         } else {
             return Ok(false);
         }

@@ -1,7 +1,8 @@
 mod commands;
 mod events;
+mod utils;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -12,17 +13,24 @@ use poise::Event;
 use tracing::{error, info, instrument, trace};
 
 pub const REACT_STR: &str = "react to this message to signup";
-pub const EMBED_COLOUR: u32 = 0xDB2727;
+pub const EMBED_COLOUR: u32 = 0x007FB3;
 
 // Types used by all command functions
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
-// Custom user data passed to all command functions
+/// Custom user data passed to all command functions
+#[derive(Debug)]
 pub struct Data {
     db_pool: sqlx::PgPool,
-    channels_and_messages: Mutex<HashMap<u64, u64>>,
-    host_ids: Mutex<HashMap<u64, Option<u64>>>,
+    messages: Mutex<HashSet<u64>>,
+    guild_configs: Mutex<HashMap<u64, GuildConfig>>,
+}
+
+#[derive(Debug, Copy, Clone, Default)]
+pub struct GuildConfig {
+    channel_id: Option<u64>,
+    host_id: Option<u64>,
 }
 
 /// Show this help menu
@@ -68,23 +76,25 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
     }
 }
 
-async fn get_all_channels_and_messages(pool: &sqlx::PgPool) -> Result<HashMap<u64, u64>, Error> {
-    let res = sqlx::query!("SELECT * FROM channel_message")
+async fn get_all_messages(pool: &sqlx::PgPool) -> Result<HashSet<u64>, Error> {
+    let res = sqlx::query!("SELECT * FROM message")
         .fetch_all(pool)
         .await?;
 
-    Ok(res
-        .iter()
-        .map(|r| (r.channel_id as u64, r.message_id as u64))
-        .collect())
+    Ok(res.iter().map(|r| (r.message_id as u64)).collect())
 }
 
-async fn get_all_host_ids(pool: &sqlx::PgPool) -> Result<HashMap<u64, Option<u64>>, Error> {
+async fn get_guild_configs(pool: &sqlx::PgPool) -> Result<HashMap<u64, GuildConfig>, Error> {
     let res = sqlx::query!("SELECT * FROM config").fetch_all(pool).await?;
 
     Ok(res
         .iter()
-        .map(|r| (r.guild_id as u64, r.host_role_id.map(|i| i as u64)))
+        .map(|r| {
+            (r.guild_id as u64, GuildConfig {
+                channel_id: r.fnf_channel_id.map(|i| i as u64),
+                host_id: r.host_role_id.map(|i| i as u64),
+            })
+        })
         .collect())
 }
 
@@ -115,10 +125,11 @@ async fn app() -> Result<(), Error> {
             help(),
             register(),
             commands::host(),
-            commands::reacts(),
+            commands::signups(),
             commands::sethost(),
             commands::shutdown(),
             commands::remove(),
+            commands::fnfchannel(),
         ],
         prefix_options: poise::PrefixFrameworkOptions {
             prefix: Some("~".into()),
@@ -145,9 +156,6 @@ async fn app() -> Result<(), Error> {
                         events::handle_on_raw_reaction(add_reaction, ctx, data, framework.bot_id.0)
                             .await?
                     },
-                    Event::ChannelDelete { channel } => {
-                        events::handle_on_channel_delete(channel.id.0, data).await?
-                    },
                     Event::Ready { data_about_bot } => {
                         info!("Connected as {}", data_about_bot.user.tag());
                         info!(
@@ -170,8 +178,8 @@ async fn app() -> Result<(), Error> {
         .await?;
     sqlx::migrate!("./migrations").run(&db_pool).await?;
 
-    let channels_and_messages = Mutex::new(get_all_channels_and_messages(&db_pool).await?);
-    let host_ids = Mutex::new(get_all_host_ids(&db_pool).await?);
+    let messages = Mutex::new(get_all_messages(&db_pool).await?);
+    let guild_configs = Mutex::new(get_guild_configs(&db_pool).await?);
 
     let framework = poise::Framework::builder()
         .token(env::var("DISCORD_TOKEN").expect("Missing `DISCORD_TOKEN` env var."))
@@ -182,8 +190,8 @@ async fn app() -> Result<(), Error> {
 
                 Ok(Data {
                     db_pool,
-                    channels_and_messages,
-                    host_ids,
+                    messages,
+                    guild_configs,
                 })
             })
         })

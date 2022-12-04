@@ -102,20 +102,20 @@ pub async fn signups(
         embed.description(format!("{desc_start}\n\nNo signups yet."));
     } else {
         embed.description(desc_start);
-        let mut in_room = String::new();
+        let mut registered = String::new();
         let mut reserves = String::new();
 
         for (i, record) in records.iter().enumerate() {
             if i < 9 {
-                in_room.push_str(&format_user_str(record.user_id));
+                registered.push_str(&format_user_str(record.user_id));
             } else {
                 reserves.push_str(&format_user_str(record.user_id));
             }
         }
 
         embed.field(
-            format!("In Room ({}/9)", records.len().min(9)),
-            in_room,
+            format!("Registered ({}/9)", records.len().min(9)),
+            registered,
             true,
         );
 

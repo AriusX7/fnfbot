@@ -66,7 +66,14 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
     match error {
         poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot: {:?}", error),
         poise::FrameworkError::Command { error, ctx } => {
-            error!("error in command `{}`: {:?}", ctx.command().name, error,);
+            error!("error in command `{}`: {:?}", ctx.command().name, error);
+            if let Err(err) = ctx.say(error.to_string()).await {
+                error!(
+                    "error when sending a message in {}: {:?}",
+                    ctx.channel_id(),
+                    err
+                );
+            }
         },
         error => {
             if let Err(e) = poise::builtins::on_error(error).await {

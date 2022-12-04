@@ -284,6 +284,20 @@ pub async fn remove(
     Ok(())
 }
 
+/// Removes all rooms from the database.
+#[poise::command(prefix_command, owners_only)]
+pub async fn removeall(ctx: Context<'_>) -> Result<(), Error> {
+    sqlx::query("DELETE FROM message")
+        .execute(&ctx.data().db_pool)
+        .await?;
+
+    sqlx::query("ALTER SEQUENCE message_num_seq RESTART WITH 1")
+        .execute(&ctx.data().db_pool)
+        .await?;
+
+    Ok(())
+}
+
 /// Returns true if user is a host
 async fn is_host(ctx: Context<'_>) -> Result<bool, Error> {
     let guild_id = match ctx.guild_id() {

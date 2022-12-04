@@ -1,45 +1,14 @@
 use poise::serenity_prelude::{
-    async_trait,
     parse_message_id_pair,
     parse_message_url,
-    ArgumentConvert,
     ChannelId,
-    Context,
     GuildId,
     MessageId,
     MessageParseError,
 };
+use sqlx::PgPool;
 
-use crate::Data;
-
-pub struct ParseableMessageId(pub u64);
-
-#[async_trait]
-impl ArgumentConvert for ParseableMessageId {
-    type Err = MessageParseError;
-
-    async fn convert(
-        _ctx: &Context,
-        _guild_id: Option<GuildId>,
-        _channel_id: Option<ChannelId>,
-        s: &str,
-    ) -> Result<Self, Self::Err> {
-        let extract_from_message_id = || Some(MessageId(s.parse().ok()?));
-
-        let extract_from_message_url = || {
-            let (_guild_id, _channel_id, message_id) =
-                parse_message_url(&s.replace("canary.", ""))?;
-            Some(message_id)
-        };
-
-        parse_message_id_pair(s)
-            .map(|(_, m)| m)
-            .or_else(extract_from_message_id)
-            .or_else(extract_from_message_url)
-            .ok_or(MessageParseError::Malformed)
-            .map(|m| ParseableMessageId(m.0))
-    }
-}
+use crate::{Data, Error};
 
 pub fn get_message_link(message_id: u64, data: &Data, guild_id: GuildId) -> Option<String> {
     let channel_id = {
@@ -59,4 +28,28 @@ pub fn get_message_link(message_id: u64, data: &Data, guild_id: GuildId) -> Opti
     };
 
     Some(MessageId(message_id).link(channel_id, Some(guild_id)))
+}
+
+pub async fn get_message_id(input: &str, pool: &PgPool) -> Result<MessageId, Error> {
+    if let Ok(i) = input.parse::<i32>() {
+        if let Some(res) = sqlx::query!("SELECT message_id FROM message WHERE num = $1", i as i32)
+            .fetch_optional(pool)
+            .await?
+        {
+            return Ok(MessageId(res.message_id as u64));
+        }
+    }
+
+    let extract_from_message_id = || Some(MessageId(input.parse().ok()?));
+    let extract_from_message_url = || {
+        let (_guild_id, _channel_id, message_id) =
+            parse_message_url(&input.replace("canary.", ""))?;
+        Some(message_id)
+    };
+
+    parse_message_id_pair(input)
+        .map(|(_, m)| m)
+        .or_else(extract_from_message_id)
+        .or_else(extract_from_message_url)
+        .ok_or(Box::new(MessageParseError::Malformed))
 }

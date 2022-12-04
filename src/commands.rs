@@ -1,7 +1,7 @@
 use poise::serenity_prelude::{self as serenity, CacheHttp, Mentionable};
 use tracing::error;
 
-use crate::utils::{get_message_link, ParseableMessageId};
+use crate::utils::{get_message_id, get_message_link};
 use crate::{invite_url, Context, Error, GuildConfig, EMBED_COLOUR, REACT_STR};
 
 /// Set up self-role reaction message for a new room.
@@ -17,6 +17,13 @@ pub async fn host(
         Some(gid) => gid,
         None => return Ok(()),
     };
+
+    // get room number
+    let room_num = sqlx::query!("SELECT last_value FROM message_num_seq")
+        .fetch_one(&ctx.data().db_pool)
+        .await?
+        .last_value
+        + 1;
 
     let channel = {
         if let Some(id) = ctx
@@ -39,6 +46,7 @@ pub async fn host(
         .send_message(&ctx, |m| {
             m.embed(|e| {
                 e.colour(EMBED_COLOUR)
+                    .title(format!("Room #{}", room_num))
                     .description(format!(
                         "{} is hosting a room at **{time}** on **{date}!**",
                         ctx.author().mention()
@@ -52,7 +60,7 @@ pub async fn host(
     msg.react(&ctx, '❌').await?;
 
     sqlx::query!(
-        "INSERT INTO message VALUES($1) ON CONFLICT (message_id) DO NOTHING",
+        "INSERT INTO message (message_id) VALUES($1) ON CONFLICT (message_id) DO NOTHING",
         msg.id.0 as i64,
     )
     .execute(&ctx.data().db_pool)
@@ -73,10 +81,25 @@ pub async fn host(
 #[poise::command(prefix_command, aliases("reacts"), guild_only, check = "is_host")]
 pub async fn registrations(
     ctx: Context<'_>,
-    #[description = "Message ID for the room"]
+    #[description = "Room number or message ID for the room"]
+    #[rename = "room"]
     #[rest]
-    message_id: ParseableMessageId,
+    room_input: String,
 ) -> Result<(), Error> {
+    let message_id = get_message_id(&room_input, &ctx.data().db_pool).await?;
+
+    let room_num = if let Some(res) = sqlx::query!(
+        "SELECT num FROM message WHERE message_id = $1",
+        message_id.0 as i64
+    )
+    .fetch_optional(&ctx.data().db_pool)
+    .await?
+    {
+        res.num
+    } else {
+        return Err("unable to find room with given number or message ID".into());
+    };
+
     let records = sqlx::query!(
         "SELECT user_id FROM signup WHERE message_id = $1 ORDER BY react_num",
         message_id.0 as i64
@@ -93,9 +116,9 @@ pub async fn registrations(
     };
 
     let desc_start = if let Some(link) = get_message_link(message_id.0, ctx.data(), guild_id) {
-        format!("**Signups for Room [{}]({})**", message_id.0, link)
+        format!("**[Signups for Room #{}]({})**", room_num, link)
     } else {
-        format!("**Signups for Room {}**", message_id.0,)
+        format!("**Signups for Room #{}**", room_num)
     };
 
     if records.is_empty() {

@@ -107,13 +107,21 @@ async fn handle_add_user(
     message_id: serenity::MessageId,
     user_id: serenity::UserId,
 ) -> Result<bool, Error> {
-    if check_if_registered(message_id, user_id, data).await? {
-        dm_user(
-            ctx,
-            user_id,
-            "You are already registered for this FNF room.",
-        )
-        .await?;
+    if let Some((mid, num)) = check_if_registered_any(user_id, data).await? {
+        if message_id == mid as u64 {
+            dm_user(ctx, user_id, "You are already registered for this room.").await?;
+        } else {
+            dm_user(
+                ctx,
+                user_id,
+                format!(
+                    "You can only register for one room. \
+                    You are currently registered for room #{}.",
+                    num
+                ),
+            )
+            .await?;
+        }
         return Ok(false);
     }
 
@@ -139,13 +147,13 @@ async fn handle_add_user(
     .await?;
 
     if count < 9 {
-        dm_user(ctx, user_id, "You registered for the FNF room.").await?;
+        dm_user(ctx, user_id, "You registered for the room.").await?;
     } else {
         dm_user(
             ctx,
             user_id,
             format!(
-                "You registered as a reserve for the FNF room. Your position is {}/6.",
+                "You registered as a reserve for the room. Your position is {}/6.",
                 count - 9 + 1
             ),
         )
@@ -173,7 +181,7 @@ async fn handle_remove_user(
     .execute(&data.db_pool)
     .await?;
 
-    dm_user(ctx, user_id, "You have deregistered from the FNF room.").await?;
+    dm_user(ctx, user_id, "You have deregistered from the room.").await?;
 
     Ok(true)
 }
@@ -191,6 +199,19 @@ async fn check_if_registered(
     .fetch_one(&data.db_pool)
     .await?;
     Ok(record.exists)
+}
+
+async fn check_if_registered_any(
+    user_id: serenity::UserId,
+    data: &Data,
+) -> Result<Option<(i64, i32)>, Error> {
+    let record = sqlx::query!(
+        "SELECT m.message_id, num FROM signup s JOIN message m ON user_id = $1 AND s.message_id = m.message_id;",
+        user_id.0 as i64,
+    )
+    .fetch_optional(&data.db_pool)
+    .await?;
+    Ok(record.map(|r| (r.message_id, r.num)))
 }
 
 async fn dm_user(

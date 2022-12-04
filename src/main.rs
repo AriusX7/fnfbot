@@ -75,6 +75,24 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
                 );
             }
         },
+        poise::FrameworkError::CommandCheckFailed { error, ctx } => {
+            error!(
+                "check failed for command `{}`: {}",
+                ctx.command().name,
+                error
+                    .as_ref()
+                    .map_or("no error provided".to_string(), |e| e.to_string())
+            );
+            if let Some(error) = error {
+                if let Err(err) = ctx.say(error.to_string()).await {
+                    error!(
+                        "error when sending a message in {}: {:?}",
+                        ctx.channel_id(),
+                        err
+                    );
+                }
+            }
+        },
         error => {
             if let Err(e) = poise::builtins::on_error(error).await {
                 error!("error while handling error: {}", e)

@@ -314,13 +314,14 @@ async fn is_host(ctx: Context<'_>) -> Result<bool, Error> {
             if let Some(id) = host_id {
                 *id
             } else {
-                return Ok(false);
+                return Err("The host role is not set.".into());
             }
         } else {
-            return Ok(false);
+            return Err("The host role is not set.".into());
         }
     };
 
+    // we don't want to show any specific error in this case
     Ok(ctx.author().has_role(&ctx, guild_id, host_role_id).await?)
 }
 

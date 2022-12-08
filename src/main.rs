@@ -250,6 +250,6 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     if let Err(e) = app().await {
-        error!("error starting bot: {}", e);
+        error!("error starting bot: {e}");
     };
 }

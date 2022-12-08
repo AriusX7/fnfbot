@@ -51,5 +51,5 @@ pub async fn get_message_id(input: &str, pool: &PgPool) -> Result<MessageId, Err
         .map(|(_, m)| m)
         .or_else(extract_from_message_id)
         .or_else(extract_from_message_url)
-        .ok_or(Box::new(MessageParseError::Malformed))
+        .ok_or_else(|| MessageParseError::Malformed.into())
 }

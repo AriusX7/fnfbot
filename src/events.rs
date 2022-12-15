@@ -137,6 +137,11 @@ async fn handle_add_user(
         return Ok(false);
     }
 
+    let mut dm = match dm_user(ctx, user_id, "Registering...").await {
+        Ok(m) => m,
+        Err(_) => return Ok(false),
+    };
+
     sqlx::query!(
         "INSERT INTO signup (message_id, user_id) VALUES ($1, $2)
             ON CONFLICT (message_id, user_id) DO NOTHING",
@@ -147,16 +152,15 @@ async fn handle_add_user(
     .await?;
 
     if count < 9 {
-        dm_user(ctx, user_id, "You registered for the room.").await?;
+        dm.edit(ctx, |m| m.content("You registered for the room."))
+            .await?;
     } else {
-        dm_user(
-            ctx,
-            user_id,
-            format!(
+        dm.edit(ctx, |m| {
+            m.content(format!(
                 "You registered as a reserve for the room. Your position is {}/6.",
                 count - 9 + 1
-            ),
-        )
+            ))
+        })
         .await?;
     }
 
@@ -173,6 +177,11 @@ async fn handle_remove_user(
         return Ok(false);
     }
 
+    let mut dm = match dm_user(ctx, user_id, "Deregistering...").await {
+        Ok(m) => m,
+        Err(_) => return Ok(false),
+    };
+
     sqlx::query!(
         "DELETE FROM signup WHERE message_id = $1 AND user_id = $2",
         message_id.0 as i64,
@@ -181,7 +190,8 @@ async fn handle_remove_user(
     .execute(&data.db_pool)
     .await?;
 
-    dm_user(ctx, user_id, "You have deregistered from the room.").await?;
+    dm.edit(ctx, |m| m.content("You have deregistered from the room."))
+        .await?;
 
     Ok(true)
 }
@@ -218,20 +228,21 @@ async fn dm_user(
     ctx: &Context,
     user_id: serenity::UserId,
     content: impl std::fmt::Display,
-) -> Result<(), Error> {
+) -> Result<serenity::Message, Error> {
     match user_id.create_dm_channel(&ctx).await {
-        Ok(c) => {
-            if let Err(e) = c.say(&ctx, content).await {
+        Ok(c) => match c.say(&ctx, content).await {
+            Ok(m) => Ok(m),
+            Err(e) => {
                 error!("unable to dm user {}, error: {}", user_id, e);
-            };
+                Err(e.into())
+            },
         },
         Err(e) => {
             error!(
                 "unable to create dm channel with user {}, error: {}",
                 user_id, e
             );
+            Err(e.into())
         },
     }
-
-    Ok(())
 }

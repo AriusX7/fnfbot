@@ -308,14 +308,10 @@ async fn is_host(ctx: Context<'_>) -> Result<bool, Error> {
     let host_role_id = {
         if let Some(GuildConfig {
             channel_id: _,
-            host_id,
+            host_id: Some(id),
         }) = ctx.data().guild_configs.lock().unwrap().get(&guild_id.0)
         {
-            if let Some(id) = host_id {
-                *id
-            } else {
-                return Err("The host role is not set.".into());
-            }
+            *id
         } else {
             return Err("The host role is not set.".into());
         }

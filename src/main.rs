@@ -8,7 +8,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use poise::serenity_prelude::oauth::Scope;
-use poise::serenity_prelude::{self as serenity, Permissions};
+use poise::serenity_prelude::{self as serenity, GatewayIntents, Permissions};
 use poise::Event;
 use tracing::{error, info, instrument, trace};
 
@@ -223,9 +223,7 @@ async fn app() -> Result<(), Error> {
         })
         .initialize_owners(true)
         .options(options)
-        .intents(
-            serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT,
-        )
+        .intents(GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT)
         .client_settings(|c| c.cache_settings(|s| s.max_messages(100)))
         .build()
         .await?;

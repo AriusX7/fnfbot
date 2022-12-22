@@ -1,4 +1,11 @@
-use poise::serenity_prelude::{self as serenity, CacheHttp, Mentionable};
+use poise::serenity_prelude::{
+    self as serenity,
+    CacheHttp,
+    Mentionable,
+    PermissionOverwrite,
+    PermissionOverwriteType,
+    Permissions,
+};
 use tracing::error;
 
 use crate::utils::{get_message_id, get_message_link};
@@ -294,6 +301,49 @@ pub async fn removeall(ctx: Context<'_>) -> Result<(), Error> {
     sqlx::query("ALTER SEQUENCE message_num_seq RESTART WITH 1")
         .execute(&ctx.data().db_pool)
         .await?;
+
+    Ok(())
+}
+
+/// Adds all players registered for the room to the specified channel.
+#[poise::command(prefix_command, check = "is_host")]
+pub async fn addplayers(
+    ctx: Context<'_>,
+    #[description = "Room number or message ID for the room"] room: String,
+    #[description = "The channel to add the players to"]
+    #[rest]
+    channel_id: serenity::ChannelId,
+) -> Result<(), Error> {
+    let message_id = get_message_id(&room, &ctx.data().db_pool).await?;
+
+    let records = sqlx::query!(
+        "SELECT user_id FROM signup WHERE message_id = $1",
+        message_id.0 as i64
+    )
+    .fetch_all(&ctx.data().db_pool)
+    .await?;
+
+    let allow =
+        Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES | Permissions::READ_MESSAGE_HISTORY;
+
+    let mut text = String::new();
+
+    for record in records {
+        if let Err(e) = channel_id
+            .create_permission(&ctx, &PermissionOverwrite {
+                allow,
+                deny: Permissions::empty(),
+                kind: PermissionOverwriteType::Member(serenity::UserId(record.user_id as u64)),
+            })
+            .await
+        {
+            text.push_str(format!("Failed to add user <@{}>: {}\n", record.user_id, e).as_str());
+        } else {
+            text.push_str(format!("Added user <@{}>", record.user_id).as_str());
+        }
+    }
+
+    ctx.say(text).await?;
 
     Ok(())
 }

@@ -12,7 +12,7 @@ use crate::utils::{get_message_id, get_message_link};
 use crate::{invite_url, Context, Error, GuildConfig, EMBED_COLOUR, REACT_STR};
 
 /// Set up self-role reaction message for a new room.
-#[poise::command(prefix_command, guild_only, check = "is_host")]
+#[poise::command(prefix_command, guild_only, check = "is_host_or_mod")]
 pub async fn host(
     ctx: Context<'_>,
     #[description = "Date for the room"] date: String,
@@ -85,7 +85,12 @@ pub async fn host(
 }
 
 /// Shows the users that signed up for the room.
-#[poise::command(prefix_command, aliases("reacts"), guild_only, check = "is_host")]
+#[poise::command(
+    prefix_command,
+    aliases("reacts"),
+    guild_only,
+    check = "is_host_or_mod"
+)]
 pub async fn registrations(
     ctx: Context<'_>,
     #[description = "Room number or message ID for the room"]
@@ -265,7 +270,7 @@ pub async fn invite(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 /// Removes a room from the database.
-#[poise::command(prefix_command, check = "is_host")]
+#[poise::command(prefix_command, check = "is_host_or_mod")]
 pub async fn remove(
     ctx: Context<'_>,
     #[description = "Message ID for the room"] message_id: u64,
@@ -306,7 +311,7 @@ pub async fn removeall(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 /// Adds all players registered for the room to the specified channel.
-#[poise::command(prefix_command, check = "is_host")]
+#[poise::command(prefix_command, check = "is_host_or_mod")]
 pub async fn addplayers(
     ctx: Context<'_>,
     #[description = "Room number or message ID for the room"] room: String,
@@ -348,12 +353,19 @@ pub async fn addplayers(
     Ok(())
 }
 
-/// Returns true if user is a host
-async fn is_host(ctx: Context<'_>) -> Result<bool, Error> {
+/// Returns true if user is a host or a moderator
+async fn is_host_or_mod(ctx: Context<'_>) -> Result<bool, Error> {
     let guild_id = match ctx.guild_id() {
         Some(gid) => gid,
         None => return Ok(false),
     };
+
+    let member = guild_id.member(&ctx, ctx.author().id).await?;
+    if let Ok(permissions) = member.permissions(&ctx) {
+        if permissions.contains(serenity::Permissions::BAN_MEMBERS) {
+            return Ok(true);
+        }
+    }
 
     let host_role_id = {
         if let Some(GuildConfig {
@@ -368,7 +380,7 @@ async fn is_host(ctx: Context<'_>) -> Result<bool, Error> {
     };
 
     // we don't want to show any specific error in this case
-    Ok(ctx.author().has_role(&ctx, guild_id, host_role_id).await?)
+    Ok(member.roles.contains(&host_role_id.into()))
 }
 
 fn format_user_str(uid: i64) -> String {

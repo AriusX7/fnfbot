@@ -29,8 +29,7 @@ pub async fn host(
     let room_num = sqlx::query!("SELECT last_value FROM message_num_seq")
         .fetch_one(&ctx.data().db_pool)
         .await?
-        .last_value
-        + 1;
+        .last_value;
 
     let channel = {
         if let Some(id) = ctx

@@ -8,7 +8,7 @@ use poise::serenity_prelude::{
 };
 use tracing::error;
 
-use crate::utils::{get_message_id, get_message_link};
+use crate::utils::{confirm_prompt, get_message_id, get_message_link};
 use crate::{invite_url, Context, Error, GuildConfig, EMBED_COLOUR, REACT_STR};
 
 /// Set up self-role reaction message for a new room.
@@ -299,6 +299,17 @@ pub async fn remove(
 /// Removes all rooms from the database.
 #[poise::command(prefix_command, owners_only)]
 pub async fn removeall(ctx: Context<'_>) -> Result<(), Error> {
+    ctx.say(
+        "This command is destructive and impacts multiple servers. \
+        If you would like to continue, enter **CONFIRM** as your next message.",
+    )
+    .await?;
+
+    if !confirm_prompt(&ctx, 30.0, "CONFIRM").await {
+        ctx.say("Cancelled execution.").await?;
+        return Ok(());
+    }
+
     sqlx::query("DELETE FROM message")
         .execute(&ctx.data().db_pool)
         .await?;
@@ -306,6 +317,8 @@ pub async fn removeall(ctx: Context<'_>) -> Result<(), Error> {
     sqlx::query("ALTER SEQUENCE message_num_seq RESTART WITH 1")
         .execute(&ctx.data().db_pool)
         .await?;
+
+    ctx.say("Removed all rooms.").await?;
 
     Ok(())
 }

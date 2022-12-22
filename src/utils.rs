@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use poise::serenity_prelude::{
     parse_message_id_pair,
     parse_message_url,
@@ -8,7 +10,7 @@ use poise::serenity_prelude::{
 };
 use sqlx::PgPool;
 
-use crate::{Data, Error};
+use crate::{Context, Data, Error};
 
 pub fn get_message_link(message_id: u64, data: &Data, guild_id: GuildId) -> Option<String> {
     let channel_id = {
@@ -52,4 +54,18 @@ pub async fn get_message_id(input: &str, pool: &PgPool) -> Result<MessageId, Err
         .or_else(extract_from_message_id)
         .or_else(extract_from_message_url)
         .ok_or_else(|| MessageParseError::Malformed.into())
+}
+
+pub async fn confirm_prompt(ctx: &Context<'_>, timeout: f32, answer: &str) -> bool {
+    if let Some(msg) = ctx
+        .author()
+        .await_reply(&ctx)
+        .channel_id(ctx.channel_id())
+        .timeout(Duration::from_secs_f32(timeout))
+        .await
+    {
+        answer == msg.content
+    } else {
+        false
+    }
 }

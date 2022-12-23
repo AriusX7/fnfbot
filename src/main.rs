@@ -93,6 +93,9 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
                 }
             }
         },
+        poise::FrameworkError::EventHandler { error, event, .. } => {
+            error!("error in event {}: {error}", event.name())
+        },
         error => {
             if let Err(e) = poise::builtins::on_error(error).await {
                 error!("error while handling error: {}", e)

@@ -142,14 +142,24 @@ async fn handle_add_user(
         Err(_) => return Ok(false),
     };
 
-    sqlx::query!(
+    if let Err(e) = sqlx::query!(
         "INSERT INTO signup (message_id, user_id) VALUES ($1, $2)
-            ON CONFLICT (message_id, user_id) DO NOTHING",
+                ON CONFLICT (message_id, user_id) DO NOTHING",
         message_id.0 as i64,
         user_id.0 as i64,
     )
     .execute(&data.db_pool)
-    .await?;
+    .await
+    {
+        dm.edit(&ctx, |f| {
+            f.content(format!(
+                "There was an error registering. Please contact \
+                an FNF Host with the following error:\n\n```{e}```"
+            ))
+        })
+        .await?;
+        error!("error registering user: {e}");
+    };
 
     if count < 9 {
         dm.edit(ctx, |m| m.content("You registered for the room."))
@@ -182,13 +192,23 @@ async fn handle_remove_user(
         Err(_) => return Ok(false),
     };
 
-    sqlx::query!(
+    if let Err(e) = sqlx::query!(
         "DELETE FROM signup WHERE message_id = $1 AND user_id = $2",
         message_id.0 as i64,
         user_id.0 as i64,
     )
     .execute(&data.db_pool)
-    .await?;
+    .await
+    {
+        dm.edit(&ctx, |f| {
+            f.content(format!(
+                "There was an error deregistering. Please contact \
+                an FNF Host with the following error:\n\n```{e}```"
+            ))
+        })
+        .await?;
+        error!("error deregistering user: {e}");
+    };
 
     dm.edit(ctx, |m| m.content("You have deregistered from the room."))
         .await?;

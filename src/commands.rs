@@ -373,7 +373,7 @@ async fn is_host_or_mod(ctx: Context<'_>) -> Result<bool, Error> {
     };
 
     let member = guild_id.member(&ctx, ctx.author().id).await?;
-    if let Ok(permissions) = member.permissions(&ctx) {
+    if let Ok(permissions) = member.permissions(ctx) {
         if permissions.contains(serenity::Permissions::BAN_MEMBERS) {
             return Ok(true);
         }

@@ -59,7 +59,7 @@ pub async fn get_message_id(input: &str, pool: &PgPool) -> Result<MessageId, Err
 pub async fn confirm_prompt(ctx: &Context<'_>, timeout: f32, answer: &str) -> bool {
     if let Some(msg) = ctx
         .author()
-        .await_reply(&ctx)
+        .await_reply(ctx)
         .channel_id(ctx.channel_id())
         .timeout(Duration::from_secs_f32(timeout))
         .await

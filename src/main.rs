@@ -215,7 +215,7 @@ async fn app() -> Result<(), Error> {
         .token(env::var("DISCORD_TOKEN").expect("Missing `DISCORD_TOKEN` env var."))
         .setup(move |ctx, _ready, _framework| {
             Box::pin(async move {
-                ctx.set_activity(serenity::Activity::playing("Friday Night Friendlies"))
+                ctx.set_activity(serenity::Activity::playing("Discord Brawl Cup"))
                     .await;
 
                 Ok(Data {

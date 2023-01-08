@@ -2,11 +2,10 @@ mod commands;
 mod events;
 mod utils;
 
-use std::collections::{HashMap, HashSet};
 use std::env;
-use std::sync::Mutex;
 use std::time::Duration;
 
+use dashmap::{DashMap, DashSet};
 use poise::serenity_prelude::oauth::Scope;
 use poise::serenity_prelude::{self as serenity, GatewayIntents, Permissions};
 use poise::Event;
@@ -23,8 +22,8 @@ type Context<'a> = poise::Context<'a, Data, Error>;
 #[derive(Debug)]
 pub struct Data {
     db_pool: sqlx::PgPool,
-    messages: Mutex<HashSet<u64>>,
-    guild_configs: Mutex<HashMap<u64, GuildConfig>>,
+    messages: DashSet<u64>,
+    guild_configs: DashMap<u64, GuildConfig>,
 }
 
 #[derive(Debug, Copy, Clone, Default)]
@@ -104,7 +103,7 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
     }
 }
 
-async fn get_all_messages(pool: &sqlx::PgPool) -> Result<HashSet<u64>, Error> {
+async fn get_all_messages(pool: &sqlx::PgPool) -> Result<DashSet<u64>, Error> {
     let res = sqlx::query!("SELECT * FROM message")
         .fetch_all(pool)
         .await?;
@@ -112,7 +111,7 @@ async fn get_all_messages(pool: &sqlx::PgPool) -> Result<HashSet<u64>, Error> {
     Ok(res.iter().map(|r| (r.message_id as u64)).collect())
 }
 
-async fn get_guild_configs(pool: &sqlx::PgPool) -> Result<HashMap<u64, GuildConfig>, Error> {
+async fn get_guild_configs(pool: &sqlx::PgPool) -> Result<DashMap<u64, GuildConfig>, Error> {
     let res = sqlx::query!("SELECT * FROM config").fetch_all(pool).await?;
 
     Ok(res
@@ -208,8 +207,8 @@ async fn app() -> Result<(), Error> {
         .await?;
     sqlx::migrate!("./migrations").run(&db_pool).await?;
 
-    let messages = Mutex::new(get_all_messages(&db_pool).await?);
-    let guild_configs = Mutex::new(get_guild_configs(&db_pool).await?);
+    let messages = get_all_messages(&db_pool).await?;
+    let guild_configs = get_guild_configs(&db_pool).await?;
 
     let framework = poise::Framework::builder()
         .token(env::var("DISCORD_TOKEN").expect("Missing `DISCORD_TOKEN` env var."))

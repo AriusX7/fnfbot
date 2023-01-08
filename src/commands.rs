@@ -31,21 +31,16 @@ pub async fn host(
         .unwrap_or_default()
         + 1;
 
-    let channel = {
-        if let Some(id) = ctx
-            .data()
-            .guild_configs
-            .lock()
-            .unwrap()
-            .get(&guild_id.0)
-            .copied()
-            .unwrap_or_default()
-            .channel_id
-        {
-            serenity::ChannelId(id)
-        } else {
-            return Err("fnf channel not set".into());
-        }
+    let channel = if let Some(id) = ctx
+        .data()
+        .guild_configs
+        .get(&guild_id.0)
+        .map(|c| c.channel_id)
+        .unwrap_or_default()
+    {
+        serenity::ChannelId(id)
+    } else {
+        return Err("fnf channel not set".into());
     };
 
     let msg = channel
@@ -73,10 +68,7 @@ pub async fn host(
     .execute(&ctx.data().db_pool)
     .await?;
 
-    {
-        let mut messages = ctx.data().messages.lock().unwrap();
-        messages.insert(msg.id.0);
-    }
+    ctx.data().messages.insert(msg.id.0);
 
     ctx.say("Self-role reaction message was set up successfully.")
         .await?;
@@ -186,11 +178,8 @@ pub async fn sethost(
     };
 
     // we try updating our local host ids cache first intentionally
-    {
-        let mut ids = ctx.data().guild_configs.lock().unwrap();
-        let entry = ids.entry(guild_id.0).or_default();
-        entry.host_id = Some(id);
-    }
+    let mut entry = ctx.data().guild_configs.entry(guild_id.0).or_default();
+    entry.host_id = Some(id);
 
     sqlx::query!(
         "INSERT INTO config (guild_id, host_role_id) VALUES ($1, $2)
@@ -217,12 +206,9 @@ pub async fn fnfchannel(
         None => return Ok(()),
     };
 
-    // we try updating our local host ids cache first intentionally
-    {
-        let mut ids = ctx.data().guild_configs.lock().unwrap();
-        let entry = ids.entry(guild_id.0).or_default();
-        entry.channel_id = Some(channel_id.0);
-    }
+    // we try updating our local channel ids cache first intentionally
+    let mut entry = ctx.data().guild_configs.entry(guild_id.0).or_default();
+    entry.channel_id = Some(channel_id.0);
 
     sqlx::query!(
         "INSERT INTO config (guild_id, fnf_channel_id) VALUES ($1, $2)
@@ -283,9 +269,7 @@ pub async fn remove(
     .await?;
 
     // only remove from our local cache if database removal is successful
-    {
-        ctx.data().messages.lock().unwrap().remove(&message_id);
-    }
+    ctx.data().messages.remove(&message_id);
 
     ctx.say(format!(
         "Removed the room associated with message {}",
@@ -376,16 +360,14 @@ async fn is_host_or_mod(ctx: Context<'_>) -> Result<bool, Error> {
         }
     }
 
-    let host_role_id = {
-        if let Some(GuildConfig {
-            channel_id: _,
-            host_id: Some(id),
-        }) = ctx.data().guild_configs.lock().unwrap().get(&guild_id.0)
-        {
-            *id
-        } else {
-            return Err("The host role is not set.".into());
-        }
+    let host_role_id = if let Some(GuildConfig {
+        channel_id: _,
+        host_id: Some(id),
+    }) = ctx.data().guild_configs.get(&guild_id.0).map(|c| *c)
+    {
+        id
+    } else {
+        return Err("The host role is not set.".into());
     };
 
     // we don't want to show any specific error in this case

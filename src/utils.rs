@@ -14,12 +14,9 @@ use crate::{Context, Data, Error};
 
 pub fn get_message_link(message_id: u64, data: &Data, guild_id: GuildId) -> Option<String> {
     data.guild_configs
-        .lock()
-        .unwrap()
         .get(&guild_id.0)
-        .copied()
+        .map(|c| c.channel_id)
         .unwrap_or_default()
-        .channel_id
         .map(|i| MessageId(message_id).link(ChannelId(i), Some(guild_id)))
 }
 

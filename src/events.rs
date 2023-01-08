@@ -21,25 +21,19 @@ pub async fn handle_on_raw_reaction(
 
     let channel_id = reaction.channel_id;
 
+    if data
+        .guild_configs
+        .get(&guild_id.0)
+        .filter(|f| f.channel_id == Some(channel_id.0))
+        .is_none()
     {
-        if data
-            .guild_configs
-            .lock()
-            .unwrap()
-            .get(&guild_id.0)
-            .filter(|f| f.channel_id == Some(channel_id.0))
-            .is_none()
-        {
-            return Ok(());
-        }
+        return Ok(());
     }
 
     let message_id = reaction.message_id;
 
-    {
-        if !data.messages.lock().unwrap().contains(&message_id.0) {
-            return Ok(());
-        }
+    if !data.messages.contains(&message_id.0) {
+        return Ok(());
     }
 
     // try to remove the reaction

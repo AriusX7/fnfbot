@@ -26,10 +26,10 @@ pub async fn host(
     };
 
     // get room number
-    let room_num = sqlx::query!("SELECT MIN(num) FROM message")
+    let room_num = sqlx::query!("SELECT MAX(num) FROM message")
         .fetch_one(&ctx.data().db_pool)
         .await?
-        .min
+        .max
         .unwrap_or_default()
         + 1;
 

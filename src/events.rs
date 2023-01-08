@@ -153,7 +153,7 @@ async fn handle_add_user(
         dm.edit(&ctx, |f| {
             f.content(format!(
                 "There was an error registering. Please contact \
-                an FNF Host with the following error:\n\n```{e}```"
+                an DBC Sheriff with the following error:\n\n```{e}```"
             ))
         })
         .await?;

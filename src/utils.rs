@@ -34,10 +34,7 @@ pub async fn get_message_id(input: &str, pool: &PgPool) -> Result<MessageId, Err
     }
 
     let extract_from_message_id = || Some(MessageId(input.parse().ok()?));
-    let extract_from_message_url = || {
-        let (_, _, message_id) = parse_message_url(&input.replace("canary.", ""))?;
-        Some(message_id)
-    };
+    let extract_from_message_url = || Some(parse_message_url(&input.replace("canary.", ""))?.2);
 
     parse_message_id_pair(input)
         .map(|(_, m)| m)

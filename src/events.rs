@@ -68,13 +68,17 @@ pub async fn handle_on_raw_reaction(
         channel_id.message(&ctx, message_id).await?
     };
 
-    let embed = if let Some(e) = msg.embeds.first() {
+    if let Some(e) = msg.embeds.first() {
         let mut embed = serenity::CreateEmbed::default();
 
         embed.colour(e.colour.unwrap_or_else(|| EMBED_COLOUR.into()));
 
+        if let Some(ref title) = e.title {
+            embed.title(title);
+        }
+
         if let Some(ref desc) = e.description {
-            embed.description(desc.clone());
+            embed.description(desc);
         }
 
         let record = sqlx::query!(
@@ -90,13 +94,8 @@ pub async fn handle_on_raw_reaction(
                 15 - record.count.unwrap_or(0)
             ))
         });
-
-        embed
-    } else {
-        return Ok(());
-    };
-
-    msg.edit(&ctx, |m| m.set_embed(embed)).await?;
+        msg.edit(&ctx, |m| m.set_embed(embed)).await?;
+    }
 
     Ok(())
 }
@@ -161,18 +160,17 @@ async fn handle_add_user(
         error!("error registering user: {e}");
     };
 
-    if count < 9 {
-        dm.edit(ctx, |m| m.content("You registered for the room."))
-            .await?;
-    } else {
-        dm.edit(ctx, |m| {
+    dm.edit(ctx, |m| {
+        if count < 9 {
+            m.content("You registered for the room.")
+        } else {
             m.content(format!(
                 "You registered as a reserve for the room. Your position is {}/6.",
                 count - 9 + 1
             ))
-        })
-        .await?;
-    }
+        }
+    })
+    .await?;
 
     Ok(true)
 }

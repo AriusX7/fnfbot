@@ -13,23 +13,14 @@ use sqlx::PgPool;
 use crate::{Context, Data, Error};
 
 pub fn get_message_link(message_id: u64, data: &Data, guild_id: GuildId) -> Option<String> {
-    let channel_id = {
-        if let Some(id) = data
-            .guild_configs
-            .lock()
-            .unwrap()
-            .get(&guild_id.0)
-            .copied()
-            .unwrap_or_default()
-            .channel_id
-        {
-            ChannelId(id)
-        } else {
-            return None;
-        }
-    };
-
-    Some(MessageId(message_id).link(channel_id, Some(guild_id)))
+    data.guild_configs
+        .lock()
+        .unwrap()
+        .get(&guild_id.0)
+        .copied()
+        .unwrap_or_default()
+        .channel_id
+        .map(|i| MessageId(message_id).link(ChannelId(i), Some(guild_id)))
 }
 
 pub async fn get_message_id(input: &str, pool: &PgPool) -> Result<MessageId, Error> {
@@ -44,8 +35,7 @@ pub async fn get_message_id(input: &str, pool: &PgPool) -> Result<MessageId, Err
 
     let extract_from_message_id = || Some(MessageId(input.parse().ok()?));
     let extract_from_message_url = || {
-        let (_guild_id, _channel_id, message_id) =
-            parse_message_url(&input.replace("canary.", ""))?;
+        let (_, _, message_id) = parse_message_url(&input.replace("canary.", ""))?;
         Some(message_id)
     };
 
@@ -57,15 +47,12 @@ pub async fn get_message_id(input: &str, pool: &PgPool) -> Result<MessageId, Err
 }
 
 pub async fn confirm_prompt(ctx: &Context<'_>, timeout: f32, answer: &str) -> bool {
-    if let Some(msg) = ctx
-        .author()
-        .await_reply(ctx)
-        .channel_id(ctx.channel_id())
-        .timeout(Duration::from_secs_f32(timeout))
-        .await
-    {
-        answer == msg.content
-    } else {
-        false
-    }
+    matches!(
+        ctx.author()
+            .await_reply(ctx)
+            .channel_id(ctx.channel_id())
+            .timeout(Duration::from_secs_f32(timeout))
+            .await,
+        Some(m) if m.content == answer,
+    )
 }

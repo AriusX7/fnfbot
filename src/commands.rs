@@ -15,6 +15,7 @@ use crate::{invite_url, Context, Error, GuildConfig, EMBED_COLOUR, REACT_STR};
 #[poise::command(prefix_command, guild_only, check = "is_host_or_mod")]
 pub async fn host(
     ctx: Context<'_>,
+    #[description = "Optional host for the room"] host: Option<serenity::Member>,
     #[description = "Date for the room"] date: String,
     #[description = "Time for the room"]
     #[rest]
@@ -57,7 +58,7 @@ pub async fn host(
                     .title(format!("Room #{}", room_num))
                     .description(format!(
                         "{} is hosting a room at **{time}** on **{date}!**",
-                        ctx.author().mention()
+                        host.map_or_else(|| ctx.author().mention(), |h| h.mention())
                     ))
                     .footer(|f| f.text(format!("15/15 spots available | {REACT_STR}")))
             })

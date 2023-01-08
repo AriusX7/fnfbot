@@ -26,10 +26,12 @@ pub async fn host(
     };
 
     // get room number
-    let room_num = sqlx::query!("SELECT last_value FROM message_num_seq")
+    let room_num = sqlx::query!("SELECT MIN(num) FROM message")
         .fetch_one(&ctx.data().db_pool)
         .await?
-        .last_value;
+        .min
+        .unwrap_or_default()
+        + 1;
 
     let channel = {
         if let Some(id) = ctx
@@ -66,8 +68,9 @@ pub async fn host(
     msg.react(&ctx, '❌').await?;
 
     sqlx::query!(
-        "INSERT INTO message (message_id) VALUES($1) ON CONFLICT (message_id) DO NOTHING",
+        "INSERT INTO message (message_id, num) VALUES($1, $2) ON CONFLICT (message_id) DO NOTHING",
         msg.id.0 as i64,
+        room_num,
     )
     .execute(&ctx.data().db_pool)
     .await?;
@@ -310,10 +313,6 @@ pub async fn removeall(ctx: Context<'_>) -> Result<(), Error> {
     }
 
     sqlx::query("DELETE FROM message")
-        .execute(&ctx.data().db_pool)
-        .await?;
-
-    sqlx::query("ALTER SEQUENCE message_num_seq RESTART WITH 1")
         .execute(&ctx.data().db_pool)
         .await?;
 

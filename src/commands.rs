@@ -16,10 +16,7 @@ use crate::{invite_url, Context, Error, GuildConfig, EMBED_COLOUR, REACT_STR};
 pub async fn host(
     ctx: Context<'_>,
     #[description = "Optional host for the room"] host: Option<serenity::Member>,
-    #[description = "Date for the room"] date: String,
-    #[description = "Time for the room"]
-    #[rest]
-    time: String,
+    #[description = "Datetime for the room"] date_time: String,
 ) -> Result<(), Error> {
     let guild_id = match ctx.guild_id() {
         Some(gid) => gid,
@@ -57,7 +54,7 @@ pub async fn host(
                 e.colour(EMBED_COLOUR)
                     .title(format!("Room #{}", room_num))
                     .description(format!(
-                        "{} is hosting a room at **{time}** on **{date}!**",
+                        "{} is hosting a room at **{date_time}!**",
                         host.map_or_else(|| ctx.author().mention(), |h| h.mention())
                     ))
                     .footer(|f| f.text(format!("15/15 spots available | {REACT_STR}")))
